@@ -135,17 +135,14 @@ function Employees({ showToast }) {
 
   return (
     <div className="max-w-5xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-gray-800">Employees</h2>
-          <p className="text-gray-500 text-sm mt-0.5">
-            {employees.length} employee{employees.length !== 1 ? 's' : ''} registered
-          </p>
-        </div>
+      {/* Action bar */}
+      <div className="flex items-center justify-between mb-5 animate-slide-up">
+        <p className="text-sm text-gray-500">
+          {employees.length} employee{employees.length !== 1 ? 's' : ''} registered
+        </p>
         <button
           onClick={() => { setShowForm(!showForm); setFieldErrors({}); setFormError(''); }}
-          className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors"
+          className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors shadow-sm shadow-indigo-200"
         >
           <UserPlus size={16} />
           {showForm ? 'Cancel' : 'Add Employee'}
@@ -207,7 +204,7 @@ function Employees({ showToast }) {
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-indigo-200"
                 >
                   {submitting ? 'Adding…' : 'Add Employee'}
                 </button>
@@ -256,7 +253,7 @@ function Employees({ showToast }) {
           </CardContent>
         </Card>
       ) : (
-        <Card className="overflow-hidden">
+        <Card className="overflow-hidden animate-slide-up">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-gray-50">

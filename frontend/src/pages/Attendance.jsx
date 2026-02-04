@@ -67,7 +67,7 @@ function Attendance({ showToast }) {
   return (
     <div className="max-w-4xl">
       {/* Mark Attendance */}
-      <Card className="mb-6">
+      <Card className="mb-6 animate-slide-up">
         <CardHeader>
           <CardTitle>Mark Attendance</CardTitle>
         </CardHeader>
@@ -117,7 +117,7 @@ function Attendance({ showToast }) {
               <button
                 type="submit"
                 disabled={submitting}
-                className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-lg hover:bg-indigo-700 active:bg-indigo-800 transition-colors disabled:opacity-60 disabled:cursor-not-allowed shadow-sm shadow-indigo-200"
               >
                 {submitting ? 'Marking…' : 'Mark Attendance'}
               </button>
@@ -128,7 +128,7 @@ function Attendance({ showToast }) {
 
       {/* Records */}
       {selectedEmployeeId ? (
-        <Card>
+        <Card className="animate-slide-up">
           <CardHeader>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -201,7 +201,7 @@ function Attendance({ showToast }) {
           )}
         </Card>
       ) : (
-        <Card>
+        <Card className="animate-slide-up">
           <CardContent className="py-12 text-center">
             <ClipboardCheck size={40} className="text-gray-300 mx-auto mb-3" />
             <p className="text-gray-500 text-sm">Select an employee above to view their attendance history.</p>

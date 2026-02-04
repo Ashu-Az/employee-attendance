@@ -17,7 +17,7 @@ function ConfirmModal({
       />
 
       {/* Modal card */}
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 animate-fade-in">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6 animate-scale-in">
         {/* Close button */}
         <button
           onClick={onCancel}

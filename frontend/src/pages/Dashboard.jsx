@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 
 function StatCard({ title, value, Icon, iconColor, iconBg }) {
   return (
-    <Card>
+    <Card className="hover:shadow-md">
       <CardContent className="pt-5">
         <div className="flex items-center justify-between">
           <div>
@@ -43,14 +43,14 @@ function Dashboard() {
     <div>
       {/* Stat cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
-        <StatCard title="Total Employees" value={employees.length} Icon={Users} iconColor="text-indigo-600" iconBg="bg-indigo-50" />
-        <StatCard title="Present Today" value={presentToday} Icon={CheckCircle2} iconColor="text-green-600" iconBg="bg-green-50" />
-        <StatCard title="Absent Today" value={absentToday} Icon={XCircle} iconColor="text-red-600" iconBg="bg-red-50" />
-        <StatCard title="Total Attendance Records" value={allAttendance.length} Icon={ClipboardCheck} iconColor="text-amber-600" iconBg="bg-amber-50" />
+        <div className="animate-stagger-1"><StatCard title="Total Employees" value={employees.length} Icon={Users} iconColor="text-indigo-600" iconBg="bg-indigo-50" /></div>
+        <div className="animate-stagger-2"><StatCard title="Present Today" value={presentToday} Icon={CheckCircle2} iconColor="text-green-600" iconBg="bg-green-50" /></div>
+        <div className="animate-stagger-3"><StatCard title="Absent Today" value={absentToday} Icon={XCircle} iconColor="text-red-600" iconBg="bg-red-50" /></div>
+        <div className="animate-stagger-4"><StatCard title="Total Attendance Records" value={allAttendance.length} Icon={ClipboardCheck} iconColor="text-amber-600" iconBg="bg-amber-50" /></div>
       </div>
 
       {/* Recent attendance */}
-      <Card>
+      <Card className="animate-slide-up">
         <CardHeader>
           <CardTitle>Recent Attendance</CardTitle>
           <CardDescription>Last 10 entries across all employees</CardDescription>

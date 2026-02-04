@@ -9,16 +9,15 @@ const Dashboard = lazy(() => import('./pages/Dashboard'));
 const Employees = lazy(() => import('./pages/Employees'));
 const Attendance = lazy(() => import('./pages/Attendance'));
 
-// Maps route paths to the heading shown in the top bar
-const PAGE_TITLES = {
-  '/': 'Dashboard',
-  '/employees': 'Employee Management',
-  '/attendance': 'Attendance',
+const PAGE_META = {
+  '/': { title: 'Dashboard', subtitle: 'Overview of your workforce' },
+  '/employees': { title: 'Employees', subtitle: 'Manage your team members' },
+  '/attendance': { title: 'Attendance', subtitle: 'Track daily attendance' },
 };
 
 function AppLayout({ showToast }) {
   const location = useLocation();
-  const title = PAGE_TITLES[location.pathname] || 'Dashboard';
+  const meta = PAGE_META[location.pathname] || PAGE_META['/'];
 
   return (
     <div className="flex h-screen bg-gray-100 font-sans">
@@ -29,8 +28,11 @@ function AppLayout({ showToast }) {
       <div className="flex-1 flex flex-col min-h-0">
         {/* Top bar */}
         <header className="bg-white border-b border-gray-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
-          <h1 className="text-lg font-semibold text-gray-800">{title}</h1>
-          <span className="text-xs font-medium text-slate-500 bg-indigo-50 text-indigo-600 px-3 py-1 rounded-full">
+          <div>
+            <h1 className="text-lg font-bold text-gray-800">{meta.title}</h1>
+            <p className="text-sm text-gray-400 mt-0.5">{meta.subtitle}</p>
+          </div>
+          <span className="text-xs font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
             Admin
           </span>
         </header>

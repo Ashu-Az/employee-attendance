@@ -26,13 +26,13 @@ TableRow.displayName = 'TableRow';
 export const TableHead = React.forwardRef(({ className, ...props }, ref) => (
   <th
     ref={ref}
-    className={cn('px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider', className)}
+    className={cn('px-4 py-3.5 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider', className)}
     {...props}
   />
 ));
 TableHead.displayName = 'TableHead';
 
 export const TableCell = React.forwardRef(({ className, ...props }, ref) => (
-  <td ref={ref} className={cn('px-4 py-3', className)} {...props} />
+  <td ref={ref} className={cn('px-4 py-3.5', className)} {...props} />
 ));
 TableCell.displayName = 'TableCell';
