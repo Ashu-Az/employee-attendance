@@ -2,6 +2,11 @@
 
 A small full-stack HR app I built for managing employees and tracking their daily attendance. Nothing fancy — just the essentials, done properly.
 
+## Live Demo
+
+- **Frontend:** https://employee-attendance-pearl.vercel.app
+- **Backend API:** https://employee-attendance-2wg3.onrender.com/api
+
 ---
 
 ## Why I picked this stack
