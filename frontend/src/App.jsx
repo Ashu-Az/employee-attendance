@@ -1,11 +1,13 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { DataProvider } from './context/DataContext';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
-import Dashboard from './pages/Dashboard';
-import Employees from './pages/Employees';
-import Attendance from './pages/Attendance';
+import Loader from './components/Loader';
+
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Employees = lazy(() => import('./pages/Employees'));
+const Attendance = lazy(() => import('./pages/Attendance'));
 
 // Maps route paths to the heading shown in the top bar
 const PAGE_TITLES = {
@@ -35,12 +37,14 @@ function AppLayout({ showToast }) {
 
         {/* Scrollable content */}
         <main className="flex-1 overflow-y-auto p-8">
-          <Routes>
-            <Route path="/" element={<Dashboard showToast={showToast} />} />
-            <Route path="/employees" element={<Employees showToast={showToast} />} />
-            <Route path="/attendance" element={<Attendance showToast={showToast} />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Suspense fallback={<Loader />}>
+            <Routes>
+              <Route path="/" element={<Dashboard showToast={showToast} />} />
+              <Route path="/employees" element={<Employees showToast={showToast} />} />
+              <Route path="/attendance" element={<Attendance showToast={showToast} />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
     </div>

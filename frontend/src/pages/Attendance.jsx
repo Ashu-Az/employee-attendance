@@ -8,7 +8,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Badge } from '@/components/ui/badge';
 
 function Attendance({ showToast }) {
-  const { employees, loading: empLoading } = useEmployees();
+  const { employees, loading: empLoading, getCachedAttendance, fetchEmployeeAttendance, invalidateEmployeeAttendance, refreshAttendance } = useEmployees();
 
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -24,16 +24,15 @@ function Attendance({ showToast }) {
 
   useEffect(() => {
     if (!selectedEmployeeId) { setAttendanceRecords([]); return; }
-    const fetchRecords = async () => {
-      setRecordsLoading(true);
-      try {
-        const { data } = await attendanceAPI.getByEmployee(selectedEmployeeId);
-        setAttendanceRecords(data);
-      } catch { setFormError('Failed to load attendance records.'); }
-      finally { setRecordsLoading(false); }
-    };
-    fetchRecords();
-  }, [selectedEmployeeId]);
+    const cached = getCachedAttendance(selectedEmployeeId);
+    if (cached) { setAttendanceRecords(cached); setRecordsLoading(false); return; }
+    let cancelled = false;
+    setRecordsLoading(true);
+    fetchEmployeeAttendance(selectedEmployeeId)
+      .then((data) => { if (!cancelled) { setAttendanceRecords(data); setRecordsLoading(false); } })
+      .catch(() => { if (!cancelled) { setFormError('Failed to load attendance records.'); setRecordsLoading(false); } });
+    return () => { cancelled = true; };
+  }, [selectedEmployeeId, getCachedAttendance, fetchEmployeeAttendance]);
 
   const handleMarkAttendance = async (e) => {
     e.preventDefault();
@@ -45,8 +44,10 @@ function Attendance({ showToast }) {
     try {
       const { data } = await attendanceAPI.mark({ employeeId: selectedEmployeeId, date, status });
       showToast(data.updated ? 'Attendance updated.' : 'Attendance marked successfully.');
-      const { data: updated } = await attendanceAPI.getByEmployee(selectedEmployeeId);
+      invalidateEmployeeAttendance(selectedEmployeeId);
+      const updated = await fetchEmployeeAttendance(selectedEmployeeId);
       setAttendanceRecords(updated);
+      refreshAttendance();
     } catch (err) {
       setFormError(err.response?.data?.message || 'Failed to mark attendance.');
     } finally { setSubmitting(false); }

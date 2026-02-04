@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserPlus, Trash2, Search, ChevronDown, CheckCircle2, XCircle, Mail, Briefcase } from 'lucide-react';
 import { useEmployees } from '@/context/DataContext';
-import { employeeAPI, attendanceAPI } from '@/services/api';
+import { employeeAPI } from '@/services/api';
 import Loader from '@/components/Loader';
 import EmptyState from '@/components/EmptyState';
 import ConfirmModal from '@/components/ConfirmModal';
@@ -25,7 +25,7 @@ const validators = {
 };
 
 function Employees({ showToast }) {
-  const { employees, loading, error, refresh } = useEmployees();
+  const { employees, loading, error, refresh, getCachedAttendance, fetchEmployeeAttendance, invalidateEmployeeAttendance } = useEmployees();
 
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({ employeeId: '', fullName: '', email: '', department: '' });
@@ -43,16 +43,15 @@ function Employees({ showToast }) {
 
   useEffect(() => {
     if (!expandedEmpId) { setHistory([]); return; }
-    const doFetch = async () => {
-      setHistoryLoading(true);
-      try {
-        const { data } = await attendanceAPI.getByEmployee(expandedEmpId);
-        setHistory(data);
-      } catch { setHistory([]); }
-      finally { setHistoryLoading(false); }
-    };
-    doFetch();
-  }, [expandedEmpId]);
+    const cached = getCachedAttendance(expandedEmpId);
+    if (cached) { setHistory(cached); setHistoryLoading(false); return; }
+    let cancelled = false;
+    setHistoryLoading(true);
+    fetchEmployeeAttendance(expandedEmpId)
+      .then((data) => { if (!cancelled) { setHistory(data); setHistoryLoading(false); } })
+      .catch(() => { if (!cancelled) { setHistory([]); setHistoryLoading(false); } });
+    return () => { cancelled = true; };
+  }, [expandedEmpId, getCachedAttendance, fetchEmployeeAttendance]);
 
   const handleBlur = (e) => {
     const msg = validators[e.target.name]?.(e.target.value) || null;
@@ -96,6 +95,7 @@ function Employees({ showToast }) {
     try {
       await employeeAPI.remove(employeeToDelete.id);
       showToast('Employee removed successfully.');
+      invalidateEmployeeAttendance(employeeToDelete.employeeId);
       if (expandedEmpId === employeeToDelete.employeeId) setExpandedEmpId(null);
       setEmployeeToDelete(null);
       await refresh();

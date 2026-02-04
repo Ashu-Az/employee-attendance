@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Users, CheckCircle2, XCircle, ClipboardCheck } from 'lucide-react';
 import { useEmployees } from '@/context/DataContext';
-import { attendanceAPI } from '@/services/api';
 import Loader from '@/components/Loader';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -26,25 +25,7 @@ function StatCard({ title, value, Icon, iconColor, iconBg }) {
 }
 
 function Dashboard() {
-  const { employees, loading: empLoading } = useEmployees();
-  const [todayAttendance, setTodayAttendance] = useState([]);
-  const [allAttendance, setAllAttendance] = useState([]);
-  const [attLoading, setAttLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    Promise.all([
-      attendanceAPI.getAll(),
-      attendanceAPI.getAll({ startDate: today, endDate: today }),
-    ])
-      .then(([allRes, todayRes]) => {
-        setAllAttendance(allRes.data);
-        setTodayAttendance(todayRes.data);
-      })
-      .catch(() => setError('Could not load dashboard data. Please refresh.'))
-      .finally(() => setAttLoading(false));
-  }, []);
+  const { employees, loading: empLoading, allAttendance, todayAttendance, attLoading } = useEmployees();
 
   const nameMap = {};
   employees.forEach((emp) => { nameMap[emp.employeeId] = emp.fullName; });
@@ -57,19 +38,6 @@ function Dashboard() {
   }));
 
   if (empLoading || attLoading) return <Loader />;
-
-  if (error) {
-    return (
-      <Card>
-        <CardContent className="pt-5 text-center py-8">
-          <p className="text-red-600 text-sm">{error}</p>
-          <button onClick={() => window.location.reload()} className="mt-3 text-indigo-600 hover:underline text-sm font-medium">
-            Try Again
-          </button>
-        </CardContent>
-      </Card>
-    );
-  }
 
   return (
     <div>
