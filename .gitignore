@@ -10,3 +10,4 @@ venv/
 .venv/
 db.sqlite3
 
+greenrider.pdf
