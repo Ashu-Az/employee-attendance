@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { UserPlus, Trash2, Search } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserPlus, Trash2, Search, ChevronDown, CheckCircle2, XCircle, Mail, Briefcase } from 'lucide-react';
 import { useEmployees } from '../context/DataContext';
-import { employeeAPI } from '../services/api';
+import { employeeAPI, attendanceAPI } from '../services/api';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
 import ConfirmModal from '../components/ConfirmModal';
@@ -52,6 +52,31 @@ function Employees({ showToast }) {
   const [search, setSearch] = useState('');
   const [filterDept, setFilterDept] = useState('');
 
+  // Expanded row detail
+  const [expandedEmpId, setExpandedEmpId] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Fetch attendance when a row is expanded
+  useEffect(() => {
+    if (!expandedEmpId) {
+      setHistory([]);
+      return;
+    }
+    const fetch = async () => {
+      setHistoryLoading(true);
+      try {
+        const { data } = await attendanceAPI.getByEmployee(expandedEmpId);
+        setHistory(data);
+      } catch {
+        setHistory([]);
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+    fetch();
+  }, [expandedEmpId]);
+
   // ── blur validation ────────────────────────────────────────
   const validateField = (name, value) => {
     const msg = validators[name]?.(value) || null;
@@ -67,7 +92,6 @@ function Employees({ showToast }) {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    // clear that field's error as the user types
     if (fieldErrors[name]) {
       setFieldErrors((prev) => ({ ...prev, [name]: null }));
     }
@@ -77,7 +101,6 @@ function Employees({ showToast }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // validate all fields at once
     const errors = {};
     let hasError = false;
     Object.keys(validators).forEach((name) => {
@@ -110,6 +133,7 @@ function Employees({ showToast }) {
     try {
       await employeeAPI.remove(employeeToDelete.id);
       showToast('Employee removed successfully.');
+      if (expandedEmpId === employeeToDelete.employeeId) setExpandedEmpId(null);
       setEmployeeToDelete(null);
       await refresh();
     } catch (err) {
@@ -150,6 +174,9 @@ function Employees({ showToast }) {
     fieldErrors[name]
       ? 'border-red-400 focus:ring-red-300'
       : 'border-gray-300 focus:ring-indigo-400';
+
+  const presentCount = history.filter((r) => r.status === 'Present').length;
+  const absentCount = history.filter((r) => r.status === 'Absent').length;
 
   // ── main render ────────────────────────────────────────────
   return (
@@ -292,7 +319,6 @@ function Employees({ showToast }) {
       {/* ── Search + Department filter bar ──────────────────── */}
       {employees.length > 0 && (
         <div className="flex flex-wrap items-center gap-3 mb-4">
-          {/* Search input */}
           <div className="relative flex-1 min-w-[180px] max-w-sm">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
             <input
@@ -305,7 +331,6 @@ function Employees({ showToast }) {
             />
           </div>
 
-          {/* Department filter */}
           <select
             value={filterDept}
             onChange={(e) => setFilterDept(e.target.value)}
@@ -320,7 +345,6 @@ function Employees({ showToast }) {
             ))}
           </select>
 
-          {/* Clear filters */}
           {(search || filterDept) && (
             <button
               onClick={() => { setSearch(''); setFilterDept(''); }}
@@ -363,32 +387,140 @@ function Employees({ showToast }) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((emp) => (
-                  <tr
-                    key={emp.id}
-                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">
-                      {emp.employeeId}
-                    </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-700">{emp.fullName}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-500">{emp.email}</td>
-                    <td className="px-5 py-3.5">
-                      <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
-                        {emp.department}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5">
-                      <button
-                        onClick={() => setEmployeeToDelete(emp)}
-                        className="flex items-center gap-1.5 text-red-500 hover:text-red-700 text-sm transition-colors"
+                {filtered.map((emp) => {
+                  const isOpen = expandedEmpId === emp.employeeId;
+                  return (
+                    <React.Fragment key={emp.id}>
+                      {/* ── main row ── */}
+                      <tr
+                        onClick={() =>
+                          setExpandedEmpId(isOpen ? null : emp.employeeId)
+                        }
+                        className={[
+                          'border-b border-gray-100 transition-colors cursor-pointer select-none',
+                          isOpen ? 'bg-indigo-50' : 'hover:bg-gray-50',
+                        ].join(' ')}
                       >
-                        <Trash2 size={15} />
-                        Delete
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                        <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">
+                          {emp.employeeId}
+                        </td>
+                        <td className="px-5 py-3.5 text-sm text-gray-700">{emp.fullName}</td>
+                        <td className="px-5 py-3.5 text-sm text-gray-500">{emp.email}</td>
+                        <td className="px-5 py-3.5">
+                          <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-50 text-indigo-700">
+                            {emp.department}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEmployeeToDelete(emp);
+                              }}
+                              className="flex items-center gap-1.5 text-red-500 hover:text-red-700 text-sm transition-colors"
+                            >
+                              <Trash2 size={15} />
+                              Delete
+                            </button>
+                            <ChevronDown
+                              size={16}
+                              className={[
+                                'text-gray-400 transition-transform',
+                                isOpen ? 'rotate-180' : '',
+                              ].join(' ')}
+                            />
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ── expanded detail panel ── */}
+                      {isOpen && (
+                        <tr className="border-b border-gray-100">
+                          <td colSpan={5} className="p-0">
+                            <div className="bg-gray-50 border-t border-indigo-100 px-5 py-4 animate-fade-in">
+
+                              {/* Details + summary badges */}
+                              <div className="flex flex-wrap items-start justify-between gap-4">
+                                {/* Left: info pills */}
+                                <div className="flex flex-wrap gap-3">
+                                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                    <Mail size={14} className="text-gray-400" />
+                                    <span>{emp.email}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-sm text-gray-600">
+                                    <Briefcase size={14} className="text-gray-400" />
+                                    <span>{emp.department}</span>
+                                  </div>
+                                </div>
+
+                                {/* Right: attendance summary badges */}
+                                <div className="flex gap-3">
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-100 px-2.5 py-1 rounded-full">
+                                    <CheckCircle2 size={12} />
+                                    Present: {presentCount}
+                                  </span>
+                                  <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-100 px-2.5 py-1 rounded-full">
+                                    <XCircle size={12} />
+                                    Absent: {absentCount}
+                                  </span>
+                                </div>
+                              </div>
+
+                              {/* Attendance history */}
+                              <div className="mt-4">
+                                {historyLoading ? (
+                                  <p className="text-xs text-gray-400 italic">Loading history…</p>
+                                ) : history.length === 0 ? (
+                                  <p className="text-xs text-gray-400 italic">No attendance records yet.</p>
+                                ) : (
+                                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                                    <table className="w-full text-sm">
+                                      <thead>
+                                        <tr className="bg-white">
+                                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Date
+                                          </th>
+                                          <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                            Status
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {history.map((record, i) => (
+                                          <tr key={i} className="border-t border-gray-100">
+                                            <td className="px-4 py-2 text-sm text-gray-600">{record.date}</td>
+                                            <td className="px-4 py-2">
+                                              <span
+                                                className={[
+                                                  'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium',
+                                                  record.status === 'Present'
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-red-100 text-red-700',
+                                                ].join(' ')}
+                                              >
+                                                {record.status === 'Present' ? (
+                                                  <CheckCircle2 size={12} />
+                                                ) : (
+                                                  <XCircle size={12} />
+                                                )}
+                                                {record.status}
+                                              </span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
