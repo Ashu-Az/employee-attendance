@@ -1,194 +1,165 @@
 # HRMS Lite
 
-A lightweight, full-stack Human Resource Management System for managing employee records and tracking daily attendance.
+A small full-stack HR app I built for managing employees and tracking their daily attendance. Nothing fancy — just the essentials, done properly.
 
 ---
 
-## Tech Stack
+## Why I picked this stack
 
-| Layer      | Technology                                            |
-| ---------- | ----------------------------------------------------- |
-| Frontend   | React 18, React Router v6, Tailwind CSS, Lucide Icons |
-| Backend    | Python 3, Django 4.2, Django REST Framework           |
-| Database   | SQLite (local) / PostgreSQL (production)              |
-| Deployment | Vercel (frontend), Render (backend)                   |
+I went with **React + Vite** on the frontend because Vite is just fast and I've used it enough to know it won't give me trouble. Tailwind for styling since I can move quick with utility classes and it keeps things looking clean without writing a ton of CSS. Lucide for icons, simple and lightweight.
+
+For the backend I picked **Django + Django REST Framework**. DRF gives you serializers, routers, and viewsets out of the box so I don't have to wire up every little thing manually. It also handles validation nicely which saved me time.
+
+Database-wise I use **SQLite locally** so anyone cloning the repo can just run it without setting up Postgres or anything. But in production I switch to **PostgreSQL on Neon** using an env variable — Django's `dj-database-url` makes that swap painless.
+
+Deployed the backend on **Render** and frontend on **Vercel**. Both were pretty straightforward to set up.
+
+| Layer      | Tech                                          |
+| ---------- | --------------------------------------------- |
+| Frontend   | React 18, React Router v6, Tailwind, Lucide  |
+| Backend    | Python 3, Django 4.2, DRF                    |
+| Database   | SQLite (local) / PostgreSQL via Neon (prod)  |
+| Deployment | Vercel (frontend), Render (backend)          |
 
 ---
 
-## Project Structure
+## How the project is structured
 
 ```
-hrms-lite/
 ├── backend/
-│   ├── hrms_project/          # Django project package
-│   │   ├── settings.py        # All Django settings
-│   │   ├── urls.py            # Root URL config
-│   │   ├── wsgi.py            # WSGI entry point for gunicorn
-│   │   └── exceptions.py      # Custom DRF error-response normaliser
-│   ├── employees/             # Django app – Employee model + API
-│   │   ├── models.py
-│   │   ├── serializers.py     # camelCase ↔ snake_case mapping
-│   │   ├── views.py           # DRF ViewSet (list / create / destroy)
-│   │   ├── urls.py
-│   │   └── migrations/
-│   ├── attendance/            # Django app – Attendance model + API
-│   │   ├── models.py
-│   │   ├── serializers.py
-│   │   ├── views.py           # upsert logic + per-employee endpoint
-│   │   ├── urls.py
-│   │   └── migrations/
+│   ├── hrms_project/          # Django project settings, urls, wsgi
+│   │   └── exceptions.py      # custom error handler so the frontend always gets { message }
+│   ├── employees/             # employee model, serializer, viewset
+│   ├── attendance/            # attendance model, serializer, viewset with upsert logic
 │   ├── manage.py
 │   ├── requirements.txt
-│   ├── start.sh               # Render start script
-│   └── .env.example
+│   └── start.sh               # runs migrate then gunicorn on Render
 │
 ├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── Sidebar.jsx        # Left navigation
-│   │   │   ├── Loader.jsx         # Spinner / loading state
-│   │   │   ├── Toast.jsx          # Success / error notification
-│   │   │   ├── EmptyState.jsx     # Placeholder when no data
-│   │   │   └── ConfirmModal.jsx   # Delete confirmation dialog
-│   │   ├── pages/
-│   │   │   ├── Dashboard.jsx      # Summary cards + recent attendance
-│   │   │   ├── Employees.jsx      # Add / list / delete employees
-│   │   │   └── Attendance.jsx     # Mark attendance + view history
-│   │   ├── services/
-│   │   │   └── api.js             # Axios wrappers for every endpoint
-│   │   ├── App.jsx                # Router + layout
-│   │   ├── main.jsx               # React entry point
-│   │   └── index.css              # Tailwind directives + scrollbar styles
-│   ├── index.html
-│   ├── vite.config.js
-│   ├── tailwind.config.js
-│   ├── postcss.config.js
-│   ├── package.json
-│   └── .env.example
+│   └── src/
+│       ├── components/        # Sidebar, Loader, Toast, ConfirmModal, EmptyState
+│       ├── context/           # DataContext — shared employee list so pages don't keep re-fetching
+│       ├── pages/             # Dashboard, Employees, Attendance
+│       ├── services/api.js    # all axios calls live here
+│       └── App.jsx            # router + layout
 │
 └── README.md
 ```
 
----
+I split the backend into two Django apps — `employees` and `attendance`. Felt cleaner than dumping everything into one app. Each one has its own models, serializers, views, and urls.
 
-## API Endpoints
-
-| Method | Endpoint                          | Description                              |
-| ------ | --------------------------------- | ---------------------------------------- |
-| GET    | `/api/health`                     | Server health check                      |
-| GET    | `/api/employees`                  | List all employees                       |
-| POST   | `/api/employees`                  | Create a new employee                    |
-| DELETE | `/api/employees/:id`              | Delete employee + their attendance       |
-| POST   | `/api/attendance`                 | Mark (or update) attendance for one day  |
-| GET    | `/api/attendance/employee/:empId` | All attendance records for one employee  |
-| GET    | `/api/attendance`                 | All records — supports `startDate` & `endDate` query params |
+On the frontend I made a `DataContext` because I noticed every page was independently fetching the employee list when it mounted. That meant navigating Dashboard → Employees → Attendance would fire the same API call three times. The context fetches once and shares the list everywhere. Pages that need to refresh after a create or delete just call the `refresh()` function.
 
 ---
 
-## Running Locally
+## API endpoints
 
-### Prerequisites
+| Method | Endpoint                          | What it does                                        |
+| ------ | --------------------------------- | --------------------------------------------------- |
+| GET    | `/api/health`                     | quick check that the server is up                   |
+| GET    | `/api/employees`                  | list all employees                                  |
+| POST   | `/api/employees`                  | add a new employee                                  |
+| DELETE | `/api/employees/:id`              | delete an employee (attendance goes with them)      |
+| POST   | `/api/attendance`                 | mark attendance — if a record already exists for that day it updates instead of duplicating |
+| GET    | `/api/attendance/employee/:empId` | get all attendance records for one employee         |
+| GET    | `/api/attendance`                 | get all records, can filter with `startDate` & `endDate` params |
 
-- Python 3.10 or higher
-- Node.js 18 or higher & npm
-- (No external database needed locally – Django uses SQLite by default)
+The attendance upsert was something I thought about early on. If someone accidentally marks the same employee twice on the same day, it just updates the status instead of throwing an error or creating a duplicate. Felt like the right call for a daily attendance tool.
 
-### 1. Backend
+---
+
+## Running it locally
+
+You need Python 3.10+ and Node.js 18+ installed. No database setup needed for local dev.
+
+**Backend:**
 
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate   # Windows: venv\Scripts\activate
+source venv/bin/activate   # on Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-Create a `.env` file (or just leave the defaults – SQLite works out of the box):
+Create a `.env` file in `backend/` (or just skip it, SQLite works without one):
 
 ```
 SECRET_KEY=any-random-string
 DEBUG=True
-DATABASE_URL=                # leave empty for SQLite
+DATABASE_URL=
 ```
 
 ```bash
-python manage.py migrate     # creates db.sqlite3 + tables
-python manage.py runserver   # starts on http://127.0.0.1:8000
+python manage.py migrate
+python manage.py runserver
 ```
 
-### 2. Frontend
+**Frontend:**
 
 ```bash
 cd frontend
 npm install
 ```
 
-Create a `.env` file:
+Create a `.env` file in `frontend/`:
 
 ```
 VITE_API_URL=http://127.0.0.1:8000/api
 ```
 
 ```bash
-npm run dev          # Vite dev server, usually http://localhost:5173
+npm run dev
 ```
 
-Open your browser and go to `http://localhost:5173`.
+Open `http://localhost:5173` and you're good.
 
 ---
 
 ## Deploying
 
-### Render (Backend)
+**Render (backend):**
 
-1. Push the repo to GitHub.
-2. Go to [render.com](https://render.com) → **New → Web Service**.
-3. Connect your GitHub repo and set the **Root Directory** to `backend`.
-4. **Runtime:** Python 3
-5. **Build command:** `pip install -r requirements.txt`
-6. **Start command:** `chmod +x start.sh && ./start.sh`
-   - `start.sh` runs `python manage.py migrate` first, then launches gunicorn.
-7. Environment variables to add:
-   - `SECRET_KEY` — a random string (e.g. from `python -c "import secrets; print(secrets.token_hex(32))"`)
-   - `DATABASE_URL` — a PostgreSQL connection string (use Render's free PostgreSQL or [Neon](https://neon.tech) free tier)
-   - `DEBUG` — set to `False`
+Push to GitHub, then go to Render → New Web Service. Point it at your repo, set root directory to `backend`.
 
-### Vercel (Frontend)
+- Runtime: Python 3
+- Build: `pip install -r requirements.txt`
+- Start: `chmod +x start.sh && ./start.sh`
 
-1. Go to [vercel.com](https://vercel.com) → **New Project**.
-2. Import your GitHub repo and set the **Root Directory** to `frontend`.
-3. Vercel detects Vite automatically — build command is `npm run build`, output is `dist`.
-4. Add an environment variable:
-   - `VITE_API_URL` — your Render backend URL (e.g. `https://hrms-lite-backend.onrender.com/api`)
-5. Deploy. Done.
+The `start.sh` script runs migrations first then starts gunicorn. Add these env vars on Render:
 
----
+- `SECRET_KEY` — generate one with `python -c "import secrets; print(secrets.token_hex(32))"`
+- `DATABASE_URL` — your Neon or Render PostgreSQL connection string
+- `DEBUG` — set to `False`
 
-## Features Implemented
+**Vercel (frontend):**
 
-### Core
-- Add / list / delete employees with full validation
-- Mark attendance (Present / Absent) for any employee on any date
-- Server-side validation: required fields, email format, duplicate Employee ID
-- Proper HTTP status codes and meaningful error messages
-- Cascade delete: removing an employee also removes their attendance records
+Go to Vercel → New Project, import the repo, set root to `frontend`. Vercel picks up Vite automatically. Just add one env var:
 
-### Bonus
-- **Dashboard summary** — total employees, present/absent today, recent attendance table
-- **Filter attendance by date** — date picker on the attendance page
-- **Present / Absent day counts** — shown per-employee when viewing their history
+- `VITE_API_URL` — your Render backend URL like `https://your-app.onrender.com/api`
 
-### UI
-- Loading, empty, and error states on every page
-- Toast notifications for success and failure
-- Confirmation modal before deleting an employee
-- Smooth animations on form appearance and toasts
-- Responsive grid layout on the add-employee form
+Hit deploy and that's it.
 
 ---
 
-## Assumptions & Limitations
+## What I built and why
 
-- Single admin user — no login or role-based access control.
-- Leave management, payroll, and advanced HR features are out of scope.
-- If attendance is marked twice for the same employee and date, the record is updated (not duplicated).
-- Locally the app uses SQLite (zero setup). For production on Render, set `DATABASE_URL` to a PostgreSQL instance so data persists across restarts.
+**Employee management** — add, list, delete. Each employee has an ID, name, email, and department. The ID has to be unique, I validate that on both the frontend and backend. If someone tries to create a duplicate the backend returns a 409 and shows the error right on the form.
+
+**Attendance** — pick an employee, pick a date, mark them Present or Absent. Their history shows up below with a count of present and absent days. I also added filters — you can filter by date and by status.
+
+**Dashboard** — I added this as a landing page so it's not just empty when you open the app. Shows total employees, who's present and absent today, and a table of recent attendance entries.
+
+**Expandable employee rows** — clicking on an employee in the table expands it to show their details and full attendance history right there. Felt more useful than navigating to a separate page for something so simple.
+
+**Validation** — on the employee form each field validates on blur, so you get instant feedback with a red border and error message as you fill things out. Not just at the end when you hit submit.
+
+**Shared data context** — like I mentioned, I pulled the employee list into a React context so it only fetches once. No more redundant network calls when switching pages.
+
+---
+
+## A few things to keep in mind
+
+- There's no login. The assignment said single admin user, no auth required, so I skipped it.
+- Leave management, payroll, all that — out of scope, not built.
+- Locally everything runs on SQLite. For production you need to set `DATABASE_URL` to a PostgreSQL instance or the data won't persist across Render restarts.
+- If you mark attendance for the same employee on the same date twice, it updates the existing record. No duplicates.
