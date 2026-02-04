@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { ClipboardCheck, CheckCircle2, XCircle } from 'lucide-react';
-import { employeeAPI, attendanceAPI } from '../services/api';
+import { useEmployees } from '../context/DataContext';
+import { attendanceAPI } from '../services/api';
 import Loader from '../components/Loader';
 
 function Attendance({ showToast }) {
-  // Master list of employees (for the dropdown)
-  const [employees, setEmployees] = useState([]);
+  const { employees, loading: empLoading } = useEmployees();
 
   // Form state
   const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
@@ -18,25 +18,9 @@ function Attendance({ showToast }) {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [recordsLoading, setRecordsLoading] = useState(false);
 
-  // Date filter (bonus feature)
+  // Filters
   const [filterDate, setFilterDate] = useState('');
-
-  // Initial load – just need the employee list
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchEmployees = async () => {
-      try {
-        const { data } = await employeeAPI.getAll();
-        setEmployees(data);
-      } catch (err) {
-        setFormError('Failed to load employee list.');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEmployees();
-  }, []);
+  const [filterStatus, setFilterStatus] = useState('');
 
   // Whenever the selected employee changes, pull their attendance
   useEffect(() => {
@@ -99,17 +83,17 @@ function Attendance({ showToast }) {
   // ── derived data ─────────────────────────────────────────
   const selectedEmployee = employees.find((e) => e.employeeId === selectedEmployeeId);
 
-  // Apply the optional date filter
-  const displayedRecords = filterDate
-    ? attendanceRecords.filter((r) => r.date === filterDate)
-    : attendanceRecords;
+  // Chain both filters: date first, then status
+  const displayedRecords = attendanceRecords
+    .filter((r) => !filterDate || r.date === filterDate)
+    .filter((r) => !filterStatus || r.status === filterStatus);
 
-  // Totals (bonus)
+  // Totals (based on unfiltered records for the employee)
   const presentCount = attendanceRecords.filter((r) => r.status === 'Present').length;
   const absentCount = attendanceRecords.filter((r) => r.status === 'Absent').length;
 
   // ── render ───────────────────────────────────────────────
-  if (loading) return <Loader />;
+  if (empLoading) return <Loader />;
 
   return (
     <div className="max-w-4xl">
@@ -196,13 +180,12 @@ function Attendance({ showToast }) {
       {/* ── Attendance records section ───────────────────── */}
       {selectedEmployeeId ? (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-          {/* Card header with stats + filter */}
+          {/* Card header with stats + filters */}
           <div className="p-5 border-b border-gray-100 flex flex-wrap items-end justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-gray-700">
                 Attendance – {selectedEmployee?.fullName}
               </h3>
-              {/* Bonus: present / absent / total counts */}
               <div className="flex gap-4 mt-2">
                 <span className="text-xs text-green-600 font-semibold">
                   Present: {presentCount}
@@ -216,9 +199,9 @@ function Attendance({ showToast }) {
               </div>
             </div>
 
-            {/* Bonus: filter by specific date */}
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500">Filter by date:</label>
+            {/* Filter controls: date + status */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <label className="text-xs text-gray-500">Date:</label>
               <input
                 type="date"
                 value={filterDate}
@@ -226,10 +209,23 @@ function Attendance({ showToast }) {
                 className="px-2 py-1 border border-gray-300 rounded text-xs
                            focus:outline-none focus:ring-1 focus:ring-indigo-400"
               />
-              {filterDate && (
+
+              <label className="text-xs text-gray-500 ml-2">Status:</label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-2 py-1 border border-gray-300 rounded text-xs bg-white
+                           focus:outline-none focus:ring-1 focus:ring-indigo-400"
+              >
+                <option value="">All</option>
+                <option value="Present">Present</option>
+                <option value="Absent">Absent</option>
+              </select>
+
+              {(filterDate || filterStatus) && (
                 <button
-                  onClick={() => setFilterDate('')}
-                  className="text-xs text-indigo-600 hover:underline"
+                  onClick={() => { setFilterDate(''); setFilterStatus(''); }}
+                  className="text-xs text-indigo-600 hover:underline ml-1"
                 >
                   Clear
                 </button>
@@ -243,8 +239,8 @@ function Attendance({ showToast }) {
           ) : displayedRecords.length === 0 ? (
             <div className="p-8 text-center">
               <p className="text-gray-400 text-sm">
-                {filterDate
-                  ? 'No record found for the selected date.'
+                {filterDate || filterStatus
+                  ? 'No records match the selected filters.'
                   : 'No attendance records yet for this employee.'}
               </p>
             </div>

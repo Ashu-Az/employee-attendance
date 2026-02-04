@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { UserPlus, Trash2, Search } from 'lucide-react';
+import { useEmployees } from '../context/DataContext';
 import { employeeAPI } from '../services/api';
 import Loader from '../components/Loader';
 import EmptyState from '../components/EmptyState';
@@ -16,10 +17,21 @@ const DEPARTMENTS = [
   'Legal',
 ];
 
+// ── per-field validators ────────────────────────────────────
+const validators = {
+  employeeId: (v) => (!v.trim() ? 'Employee ID is required.' : null),
+  fullName: (v) => (!v.trim() ? 'Full name is required.' : null),
+  email: (v) => {
+    if (!v.trim()) return 'Email address is required.';
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim())
+      ? null
+      : 'Please enter a valid email address.';
+  },
+  department: (v) => (!v ? 'Please select a department.' : null),
+};
+
 function Employees({ showToast }) {
-  const [employees, setEmployees] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const { employees, loading, error, refresh } = useEmployees();
 
   // Form state
   const [showForm, setShowForm] = useState(false);
@@ -29,67 +41,62 @@ function Employees({ showToast }) {
     email: '',
     department: '',
   });
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   // Delete confirmation
   const [employeeToDelete, setEmployeeToDelete] = useState(null);
 
-  // ── data fetching ──────────────────────────────────────────
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const { data } = await employeeAPI.getAll();
-      setEmployees(data);
-      setError(null);
-    } catch (err) {
-      setError('Something went wrong while loading employees.');
-    } finally {
-      setLoading(false);
-    }
+  // Filters
+  const [search, setSearch] = useState('');
+  const [filterDept, setFilterDept] = useState('');
+
+  // ── blur validation ────────────────────────────────────────
+  const validateField = (name, value) => {
+    const msg = validators[name]?.(value) || null;
+    setFieldErrors((prev) => ({ ...prev, [name]: msg }));
+    return msg;
   };
 
-  useEffect(() => {
-    fetchEmployees();
-  }, []);
+  const handleBlur = (e) => {
+    validateField(e.target.name, e.target.value);
+  };
 
   // ── form handling ──────────────────────────────────────────
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (formError) setFormError('');
-  };
-
-  const validateForm = () => {
-    if (!formData.employeeId.trim()) return 'Employee ID is required.';
-    if (!formData.fullName.trim()) return 'Full name is required.';
-    if (!formData.email.trim()) return 'Email address is required.';
-
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailPattern.test(formData.email.trim())) {
-      return 'Please enter a valid email address.';
+    // clear that field's error as the user types
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => ({ ...prev, [name]: null }));
     }
-
-    if (!formData.department) return 'Please select a department.';
-    return null;
+    if (formError) setFormError('');
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    const validationMsg = validateForm();
-    if (validationMsg) {
-      setFormError(validationMsg);
-      return;
-    }
+    // validate all fields at once
+    const errors = {};
+    let hasError = false;
+    Object.keys(validators).forEach((name) => {
+      const msg = validators[name](formData[name]);
+      errors[name] = msg;
+      if (msg) hasError = true;
+    });
+    setFieldErrors(errors);
+    if (hasError) return;
 
     setSubmitting(true);
+    setFormError('');
     try {
       await employeeAPI.create(formData);
       showToast('Employee added successfully.');
       setFormData({ employeeId: '', fullName: '', email: '', department: '' });
+      setFieldErrors({});
       setShowForm(false);
-      await fetchEmployees();
+      await refresh();
     } catch (err) {
       const msg = err.response?.data?.message || 'Failed to add employee.';
       setFormError(msg);
@@ -104,14 +111,24 @@ function Employees({ showToast }) {
       await employeeAPI.remove(employeeToDelete.id);
       showToast('Employee removed successfully.');
       setEmployeeToDelete(null);
-      await fetchEmployees();
+      await refresh();
     } catch (err) {
       showToast('Failed to delete employee. Please try again.', 'error');
       setEmployeeToDelete(null);
     }
   };
 
-  // ── render states ──────────────────────────────────────────
+  // ── filtered list ──────────────────────────────────────────
+  const filtered = employees.filter((emp) => {
+    const matchesSearch =
+      emp.fullName.toLowerCase().includes(search.toLowerCase()) ||
+      emp.employeeId.toLowerCase().includes(search.toLowerCase()) ||
+      emp.email.toLowerCase().includes(search.toLowerCase());
+    const matchesDept = !filterDept || emp.department === filterDept;
+    return matchesSearch && matchesDept;
+  });
+
+  // ── render guards ──────────────────────────────────────────
   if (loading) return <Loader />;
 
   if (error) {
@@ -119,7 +136,7 @@ function Employees({ showToast }) {
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
         <p className="text-red-600 text-sm">{error}</p>
         <button
-          onClick={fetchEmployees}
+          onClick={refresh}
           className="mt-3 text-indigo-600 hover:underline text-sm font-medium"
         >
           Try Again
@@ -127,6 +144,12 @@ function Employees({ showToast }) {
       </div>
     );
   }
+
+  // helper: input border class
+  const inputBorder = (name) =>
+    fieldErrors[name]
+      ? 'border-red-400 focus:ring-red-300'
+      : 'border-gray-300 focus:ring-indigo-400';
 
   // ── main render ────────────────────────────────────────────
   return (
@@ -142,6 +165,7 @@ function Employees({ showToast }) {
         <button
           onClick={() => {
             setShowForm(!showForm);
+            setFieldErrors({});
             setFormError('');
           }}
           className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-indigo-700 transition-colors"
@@ -168,11 +192,14 @@ function Employees({ showToast }) {
                   name="employeeId"
                   value={formData.employeeId}
                   onChange={handleInputChange}
+                  onBlur={handleBlur}
                   placeholder="e.g. EMP001"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                             transition-shadow"
+                  className={`w-full px-3 py-2 border ${inputBorder('employeeId')} rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:border-transparent transition-shadow`}
                 />
+                {fieldErrors.employeeId && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.employeeId}</p>
+                )}
               </div>
 
               {/* Full Name */}
@@ -185,11 +212,14 @@ function Employees({ showToast }) {
                   name="fullName"
                   value={formData.fullName}
                   onChange={handleInputChange}
+                  onBlur={handleBlur}
                   placeholder="John Doe"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                             transition-shadow"
+                  className={`w-full px-3 py-2 border ${inputBorder('fullName')} rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:border-transparent transition-shadow`}
                 />
+                {fieldErrors.fullName && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.fullName}</p>
+                )}
               </div>
 
               {/* Email */}
@@ -202,11 +232,14 @@ function Employees({ showToast }) {
                   name="email"
                   value={formData.email}
                   onChange={handleInputChange}
+                  onBlur={handleBlur}
                   placeholder="john@example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm
-                             focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                             transition-shadow"
+                  className={`w-full px-3 py-2 border ${inputBorder('email')} rounded-lg text-sm
+                             focus:outline-none focus:ring-2 focus:border-transparent transition-shadow`}
                 />
+                {fieldErrors.email && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.email}</p>
+                )}
               </div>
 
               {/* Department */}
@@ -218,9 +251,9 @@ function Employees({ showToast }) {
                   name="department"
                   value={formData.department}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
-                             focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent
-                             transition-shadow"
+                  onBlur={handleBlur}
+                  className={`w-full px-3 py-2 border ${inputBorder('department')} rounded-lg text-sm bg-white
+                             focus:outline-none focus:ring-2 focus:border-transparent transition-shadow`}
                 >
                   <option value="">Select department</option>
                   {DEPARTMENTS.map((dept) => (
@@ -229,10 +262,13 @@ function Employees({ showToast }) {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.department && (
+                  <p className="text-red-500 text-xs mt-1">{fieldErrors.department}</p>
+                )}
               </div>
             </div>
 
-            {/* Inline error */}
+            {/* Server-level error (e.g. duplicate ID 409) */}
             {formError && (
               <p className="text-red-500 text-sm mt-3 animate-fade-in">{formError}</p>
             )}
@@ -253,9 +289,56 @@ function Employees({ showToast }) {
         </div>
       )}
 
+      {/* ── Search + Department filter bar ──────────────────── */}
+      {employees.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 mb-4">
+          {/* Search input */}
+          <div className="relative flex-1 min-w-[180px] max-w-sm">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, ID or email…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm
+                         focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+            />
+          </div>
+
+          {/* Department filter */}
+          <select
+            value={filterDept}
+            onChange={(e) => setFilterDept(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white
+                       focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:border-transparent"
+          >
+            <option value="">All Departments</option>
+            {DEPARTMENTS.map((dept) => (
+              <option key={dept} value={dept}>
+                {dept}
+              </option>
+            ))}
+          </select>
+
+          {/* Clear filters */}
+          {(search || filterDept) && (
+            <button
+              onClick={() => { setSearch(''); setFilterDept(''); }}
+              className="text-xs text-indigo-600 hover:underline"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Employee list / table ────────────────────────── */}
       {employees.length === 0 ? (
         <EmptyState message="No employees added yet. Click 'Add Employee' to get started." />
+      ) : filtered.length === 0 ? (
+        <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+          <p className="text-gray-400 text-sm">No employees match your filters.</p>
+        </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
@@ -280,7 +363,7 @@ function Employees({ showToast }) {
                 </tr>
               </thead>
               <tbody>
-                {employees.map((emp) => (
+                {filtered.map((emp) => (
                   <tr
                     key={emp.id}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"

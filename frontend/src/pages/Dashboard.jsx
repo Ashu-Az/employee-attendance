@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, CheckCircle2, XCircle, ClipboardCheck } from 'lucide-react';
-import { employeeAPI, attendanceAPI } from '../services/api';
+import { useEmployees } from '../context/DataContext';
+import { attendanceAPI } from '../services/api';
 import Loader from '../components/Loader';
 
 // ── Reusable summary card ───────────────────────────────────
@@ -21,70 +22,51 @@ function StatCard({ title, value, Icon, iconColor, iconBg }) {
 }
 
 function Dashboard() {
-  const [stats, setStats] = useState({
-    totalEmployees: 0,
-    presentToday: 0,
-    absentToday: 0,
-    totalRecords: 0,
-  });
-  const [recentRecords, setRecentRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { employees, loading: empLoading } = useEmployees();
+
+  const [todayAttendance, setTodayAttendance] = useState([]);
+  const [allAttendance, setAllAttendance] = useState([]);
+  const [attLoading, setAttLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    loadDashboard();
+    const today = new Date().toISOString().split('T')[0];
+
+    Promise.all([
+      attendanceAPI.getAll(),
+      attendanceAPI.getAll({ startDate: today, endDate: today }),
+    ])
+      .then(([allRes, todayRes]) => {
+        setAllAttendance(allRes.data);
+        setTodayAttendance(todayRes.data);
+      })
+      .catch(() => setError('Could not load dashboard data. Please refresh.'))
+      .finally(() => setAttLoading(false));
   }, []);
 
-  const loadDashboard = async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0];
+  // ── derived stats ──────────────────────────────────────────
+  const nameMap = {};
+  employees.forEach((emp) => {
+    nameMap[emp.employeeId] = emp.fullName;
+  });
 
-      // Fire all three requests at the same time
-      const [empRes, allAttRes, todayAttRes] = await Promise.all([
-        employeeAPI.getAll(),
-        attendanceAPI.getAll(),
-        attendanceAPI.getAll({ startDate: today, endDate: today }),
-      ]);
+  const presentToday = todayAttendance.filter((a) => a.status === 'Present').length;
+  const absentToday = todayAttendance.filter((a) => a.status === 'Absent').length;
 
-      const employees = empRes.data;
-      const allAttendance = allAttRes.data;
-      const todayAttendance = todayAttRes.data;
+  const recentRecords = allAttendance.slice(0, 10).map((record) => ({
+    ...record,
+    employeeName: nameMap[record.employeeId] || 'Unknown',
+  }));
 
-      // Quick lookup: employeeId → name
-      const nameMap = {};
-      employees.forEach((emp) => {
-        nameMap[emp.employeeId] = emp.fullName;
-      });
-
-      setStats({
-        totalEmployees: employees.length,
-        presentToday: todayAttendance.filter((a) => a.status === 'Present').length,
-        absentToday: todayAttendance.filter((a) => a.status === 'Absent').length,
-        totalRecords: allAttendance.length,
-      });
-
-      // Show the 10 most recent records with employee names resolved
-      setRecentRecords(
-        allAttendance.slice(0, 10).map((record) => ({
-          ...record,
-          employeeName: nameMap[record.employeeId] || 'Unknown',
-        }))
-      );
-    } catch (err) {
-      setError('Could not load dashboard data. Please refresh.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (loading) return <Loader />;
+  // ── render guards ──────────────────────────────────────────
+  if (empLoading || attLoading) return <Loader />;
 
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-xl p-6 text-center">
         <p className="text-red-600 text-sm">{error}</p>
         <button
-          onClick={loadDashboard}
+          onClick={() => window.location.reload()}
           className="mt-3 text-indigo-600 hover:underline text-sm font-medium"
         >
           Try Again
@@ -99,28 +81,28 @@ function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
         <StatCard
           title="Total Employees"
-          value={stats.totalEmployees}
+          value={employees.length}
           Icon={Users}
           iconColor="text-indigo-600"
           iconBg="bg-indigo-50"
         />
         <StatCard
           title="Present Today"
-          value={stats.presentToday}
+          value={presentToday}
           Icon={CheckCircle2}
           iconColor="text-green-600"
           iconBg="bg-green-50"
         />
         <StatCard
           title="Absent Today"
-          value={stats.absentToday}
+          value={absentToday}
           Icon={XCircle}
           iconColor="text-red-600"
           iconBg="bg-red-50"
         />
         <StatCard
           title="Total Attendance Records"
-          value={stats.totalRecords}
+          value={allAttendance.length}
           Icon={ClipboardCheck}
           iconColor="text-amber-600"
           iconBg="bg-amber-50"

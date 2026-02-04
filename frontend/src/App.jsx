@@ -1,5 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { DataProvider } from './context/DataContext';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import Dashboard from './pages/Dashboard';
@@ -55,7 +56,9 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AppLayout showToast={showToast} />
+      <DataProvider>
+        <AppLayout showToast={showToast} />
+      </DataProvider>
 
       {/* Toast notification – rendered outside the layout so it floats */}
       {toast && (
