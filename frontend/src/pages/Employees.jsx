@@ -101,7 +101,7 @@ function Employees({ showToast }) {
   // ── delete handling ────────────────────────────────────────
   const handleDeleteConfirm = async () => {
     try {
-      await employeeAPI.remove(employeeToDelete._id);
+      await employeeAPI.remove(employeeToDelete.id);
       showToast('Employee removed successfully.');
       setEmployeeToDelete(null);
       await fetchEmployees();
@@ -282,7 +282,7 @@ function Employees({ showToast }) {
               <tbody>
                 {employees.map((emp) => (
                   <tr
-                    key={emp._id}
+                    key={emp.id}
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors"
                   >
                     <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">

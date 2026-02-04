@@ -6,12 +6,12 @@ A lightweight, full-stack Human Resource Management System for managing employee
 
 ## Tech Stack
 
-| Layer      | Technology                                          |
-| ---------- | --------------------------------------------------- |
+| Layer      | Technology                                            |
+| ---------- | ----------------------------------------------------- |
 | Frontend   | React 18, React Router v6, Tailwind CSS, Lucide Icons |
-| Backend    | Node.js, Express.js                                 |
-| Database   | MongoDB (Mongoose ODM)                              |
-| Deployment | Vercel (frontend), Render (backend), MongoDB Atlas  |
+| Backend    | Python 3, Django 4.2, Django REST Framework           |
+| Database   | SQLite (local) / PostgreSQL (production)              |
+| Deployment | Vercel (frontend), Render (backend)                   |
 
 ---
 
@@ -20,16 +20,26 @@ A lightweight, full-stack Human Resource Management System for managing employee
 ```
 hrms-lite/
 ├── backend/
-│   ├── config/
-│   │   └── db.js              # MongoDB connection
-│   ├── models/
-│   │   ├── Employee.js        # Employee schema
-│   │   └── Attendance.js      # Attendance schema (compound index on employeeId + date)
-│   ├── routes/
-│   │   ├── employees.js       # CRUD routes for employees
-│   │   └── attendance.js      # Mark & query attendance
-│   ├── server.js              # Express app entry point
-│   ├── package.json
+│   ├── hrms_project/          # Django project package
+│   │   ├── settings.py        # All Django settings
+│   │   ├── urls.py            # Root URL config
+│   │   ├── wsgi.py            # WSGI entry point for gunicorn
+│   │   └── exceptions.py      # Custom DRF error-response normaliser
+│   ├── employees/             # Django app – Employee model + API
+│   │   ├── models.py
+│   │   ├── serializers.py     # camelCase ↔ snake_case mapping
+│   │   ├── views.py           # DRF ViewSet (list / create / destroy)
+│   │   ├── urls.py
+│   │   └── migrations/
+│   ├── attendance/            # Django app – Attendance model + API
+│   │   ├── models.py
+│   │   ├── serializers.py
+│   │   ├── views.py           # upsert logic + per-employee endpoint
+│   │   ├── urls.py
+│   │   └── migrations/
+│   ├── manage.py
+│   ├── requirements.txt
+│   ├── start.sh               # Render start script
 │   └── .env.example
 │
 ├── frontend/
@@ -79,28 +89,30 @@ hrms-lite/
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- npm
-- A free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster
+- Python 3.10 or higher
+- Node.js 18 or higher & npm
+- (No external database needed locally – Django uses SQLite by default)
 
 ### 1. Backend
 
 ```bash
 cd backend
-npm install
+python -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-Create a `.env` file (copy `.env.example` and fill in your values):
+Create a `.env` file (or just leave the defaults – SQLite works out of the box):
 
 ```
-MONGODB_URI=mongodb+srv://user:pass@cluster.mongodb.net/hrms_lite?retryWrites=true&w=majority
-PORT=5000
+SECRET_KEY=any-random-string
+DEBUG=True
+DATABASE_URL=                # leave empty for SQLite
 ```
 
 ```bash
-npm run dev          # starts with nodemon (auto-reload)
-# or
-npm start            # plain node (use this in production)
+python manage.py migrate     # creates db.sqlite3 + tables
+python manage.py runserver   # starts on http://127.0.0.1:8000
 ```
 
 ### 2. Frontend
@@ -113,7 +125,7 @@ npm install
 Create a `.env` file:
 
 ```
-VITE_API_URL=http://localhost:5000/api
+VITE_API_URL=http://127.0.0.1:8000/api
 ```
 
 ```bash
@@ -126,23 +138,19 @@ Open your browser and go to `http://localhost:5173`.
 
 ## Deploying
 
-### MongoDB Atlas (Database)
-
-1. Sign up at [atlas.mongodb.com](https://www.mongodb.com/cloud/atlas).
-2. Create a free-tier cluster.
-3. Add `0.0.0.0/0` to the IP allowlist (or restrict to your deployment IPs).
-4. Copy the connection string — you'll need it for the backend `.env`.
-
 ### Render (Backend)
 
 1. Push the repo to GitHub.
 2. Go to [render.com](https://render.com) → **New → Web Service**.
 3. Connect your GitHub repo and set the **Root Directory** to `backend`.
-4. Build command: `npm install`
-5. Start command: `node server.js`
-6. Add environment variables:
-   - `MONGODB_URI` — your Atlas connection string
-   - `PORT` — Render sets this automatically, but you can leave it blank
+4. **Runtime:** Python 3
+5. **Build command:** `pip install -r requirements.txt`
+6. **Start command:** `chmod +x start.sh && ./start.sh`
+   - `start.sh` runs `python manage.py migrate` first, then launches gunicorn.
+7. Environment variables to add:
+   - `SECRET_KEY` — a random string (e.g. from `python -c "import secrets; print(secrets.token_hex(32))"`)
+   - `DATABASE_URL` — a PostgreSQL connection string (use Render's free PostgreSQL or [Neon](https://neon.tech) free tier)
+   - `DEBUG` — set to `False`
 
 ### Vercel (Frontend)
 
@@ -183,4 +191,4 @@ Open your browser and go to `http://localhost:5173`.
 - Single admin user — no login or role-based access control.
 - Leave management, payroll, and advanced HR features are out of scope.
 - If attendance is marked twice for the same employee and date, the record is updated (not duplicated).
-- MongoDB Atlas free tier is sufficient; no local MongoDB installation is needed.
+- Locally the app uses SQLite (zero setup). For production on Render, set `DATABASE_URL` to a PostgreSQL instance so data persists across restarts.
