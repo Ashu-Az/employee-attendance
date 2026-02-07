@@ -32,12 +32,23 @@ export function DataProvider({ children }) {
     try {
       setAttLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const [allRes, todayRes] = await Promise.all([
-        attendanceAPI.getAll(),
+
+      // Fetch last 30 days instead of all records for better performance
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const startDate = thirtyDaysAgo.toISOString().split('T')[0];
+
+      const [recentRes, todayRes] = await Promise.all([
+        attendanceAPI.getAll({ startDate, endDate: today }),
         attendanceAPI.getAll({ startDate: today, endDate: today }),
       ]);
-      setAllAttendance(allRes.data);
-      setTodayAttendance(todayRes.data);
+
+      // Handle paginated response (backend now returns {count, next, previous, results})
+      const recentData = recentRes.data.results || recentRes.data;
+      const todayData = todayRes.data.results || todayRes.data;
+
+      setAllAttendance(recentData);
+      setTodayAttendance(todayData);
     } catch {
       // non-fatal — pages keep showing what they have
     } finally {

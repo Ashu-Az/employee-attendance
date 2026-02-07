@@ -1,10 +1,18 @@
+from datetime import datetime, timedelta
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
 
 from employees.models import Employee
 from .models import Attendance
 from .serializers import AttendanceSerializer
+
+
+class AttendancePagination(PageNumberPagination):
+    page_size = 50
+    page_size_query_param = 'page_size'
+    max_page_size = 500
 
 
 class AttendanceViewSet(viewsets.ModelViewSet):
@@ -16,6 +24,7 @@ class AttendanceViewSet(viewsets.ModelViewSet):
 
     queryset = Attendance.objects.all().order_by('-date')
     serializer_class = AttendanceSerializer
+    pagination_class = AttendancePagination
     http_method_names = ['get', 'post']
 
     # ── filtered list ──────────────────────────────────────────
@@ -23,8 +32,14 @@ class AttendanceViewSet(viewsets.ModelViewSet):
         qs = super().get_queryset()
         start = self.request.query_params.get('startDate')
         end = self.request.query_params.get('endDate')
-        if start and end:
+
+        # If no date range specified, default to last 30 days for better performance
+        if not start and not end:
+            thirty_days_ago = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+            qs = qs.filter(date__gte=thirty_days_ago)
+        elif start and end:
             qs = qs.filter(date__gte=start, date__lte=end)
+
         return qs
 
     # ── create / update (upsert) ───────────────────────────────
